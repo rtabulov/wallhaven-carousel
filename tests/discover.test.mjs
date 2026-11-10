@@ -9,8 +9,15 @@ const qml = readFileSync(new URL('../DiscoverView.qml', import.meta.url), 'utf8'
 function discovery(overrides = {}) {
     const calls = [];
     const data = Array.from({ length: 12 }, (_, i) => ({ wid: String(i), fileName: `wallhaven-${i}.jpg`, full: `https://w.wallhaven.cc/${i}.jpg` }));
+    const saved = [];
     const state = {
-        hub: { apiKey: '', previewDir: '/cache/preview', previewScript: '/plugin/preview-cache.sh', userAgent: 'test-agent' },
+        hub: {
+            apiKey: '',
+            previewDir: '/cache/preview',
+            previewScript: '/plugin/preview-cache.sh',
+            userAgent: 'test-agent',
+            saveData: (key, value) => saved.push([key, value]),
+        },
         api: 'https://wallhaven.cc/api/v1', query: '', categories: '111', purity: '111', sorting: 'toplist', topRange: '1M', atleast: '', seed: '',
         previewing: true, grid: { currentIndex: 0 }, results: { count: data.length, get: i => data[i] },
         cachedFull: {}, fetchingFull: {}, failedFull: {}, previewQueue: [], cacheMinutes: 30,
@@ -18,6 +25,7 @@ function discovery(overrides = {}) {
         I18n: { trFor: (_id, text) => text },
         ...overrides,
     };
+    state.saved = saved;
     state.view = state;
     vm.createContext(state);
     for (const match of qml.matchAll(/^    function (\w+)\(([^)]*)\) \{\n([\s\S]*?)^    \}/gm)) {
@@ -25,6 +33,26 @@ function discovery(overrides = {}) {
     }
     return { state, calls };
 }
+
+test('persistFilters writes every search-driving field, including empty query and atleast', () => {
+    const { state } = discovery({
+        query: ' mountains ',
+        categories: '101',
+        purity: '110',
+        sorting: 'hot',
+        atleast: '',
+        topRange: '1w',
+    });
+    state.persistFilters();
+    assert.deepEqual(Object.fromEntries(state.saved), {
+        query: ' mountains ',
+        categories: '101',
+        purity: '110',
+        sorting: 'hot',
+        atleast: '',
+        topRange: '1w',
+    });
+});
 
 test('no key keeps SFW; all seven toplist periods reach the API URL', () => {
     const { state } = discovery();

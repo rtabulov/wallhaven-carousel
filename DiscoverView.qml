@@ -14,12 +14,13 @@ FocusScope {
     readonly property string api: "https://wallhaven.cc/api/v1"
     readonly property int detailW: 440
 
-    property string query: ""
-    property string categories: "111"
+    property string query: String(hub.pluginData?.query ?? "")
+    property string categories: String(hub.pluginData?.categories || "111")
     // SFW, Sketchy, NSFW. Only sent with an API key; without one it's SFW.
     property string purity: String(hub.pluginData?.purity || "100")
-    property string sorting: "toplist"
-    property string atleast: "1920x1080"
+    property string sorting: String(hub.pluginData?.sorting || "toplist")
+    // Empty string is "Any size"; only fall back when the key was never saved.
+    property string atleast: hub.pluginData?.atleast != null ? String(hub.pluginData.atleast) : "1920x1080"
     property int page: 1
     property int lastPage: 1
     property int total: -1
@@ -145,7 +146,17 @@ FocusScope {
         return I18n.trFor("wallhavenCarousel", "No connection to Wallhaven.");
     }
 
+    function persistFilters() {
+        hub.saveData("query", query);
+        hub.saveData("categories", categories);
+        hub.saveData("purity", purity);
+        hub.saveData("sorting", sorting);
+        hub.saveData("atleast", atleast);
+        hub.saveData("topRange", topRange);
+    }
+
     function search() {
+        persistFilters();
         const mine = ++serial;
         page = 1;
         lastPage = 1;
@@ -389,7 +400,6 @@ FocusScope {
         if (c.join("") === "000")
             return;
         purity = c.join("");
-        hub.saveData("purity", purity);
         search();
     }
 
@@ -604,7 +614,6 @@ FocusScope {
                     active: view.topRange === modelData.v
                     onClicked: {
                         view.topRange = modelData.v;
-                        view.hub.saveData("topRange", modelData.v);
                         view.search();
                     }
                 }
