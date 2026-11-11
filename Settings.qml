@@ -29,13 +29,6 @@ PluginSettings {
         placeholder: "~/Pictures/Wallpapers"
     }
 
-    StringSetting {
-        settingKey: "apiKey"
-        label: I18n.trFor("wallhavenCarousel", "Wallhaven API key")
-        description: I18n.trFor("wallhavenCarousel", "Optional. Unlocks the Sketchy and NSFW filters. Get one at wallhaven.cc/settings/account. Stored in plain text.")
-        placeholder: ""
-    }
-
     SelectionSetting {
         settingKey: "favoritesInterval"
         label: I18n.trFor("wallhavenCarousel", "Shuffle favorites every")
@@ -67,5 +60,13 @@ PluginSettings {
             }
         ]
         defaultValue: "60"
+    }
+
+    StyledText {
+        width: parent.width
+        text: I18n.trFor("wallhavenCarousel", "Sketchy and NSFW need WALLHAVEN_API_KEY in the session environment (for example ~/.config/environment.d/). Get a key at wallhaven.cc/settings/account. Not stored in plugin settings.")
+        font.pixelSize: Theme.fontSizeSmall
+        color: Theme.surfaceVariantText
+        wrapMode: Text.WordWrap
     }
 }

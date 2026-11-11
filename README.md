@@ -51,7 +51,7 @@ The cards use DMS's thumbnail cache at `~/.cache/DankMaterialShell/imagecache`. 
 
 Downloads are named `wallhaven-<id>.<ext>`. Each one goes to a `.part` file and is renamed when complete, so the carousel never shows half an image.
 
-With a Wallhaven API key in the settings, SFW, Sketchy and NSFW buttons show up next to the categories. API searches and wallpaper details send the key in an `X-API-Key` header. Without a key, the search is SFW only.
+With `WALLHAVEN_API_KEY` in the session environment, SFW, Sketchy and NSFW buttons show up next to the categories. API searches and wallpaper details send the key in an `X-API-Key` header (from the env, not the process argv). Without a key, the search is SFW only.
 
 ### See it full size before you download
 
@@ -138,13 +138,14 @@ In Settings → Plugins → Wallhaven Carousel:
 
 - **Wallpaper folder.** Left empty, the plugin uses the folder DMS cycles through, or else the folder of the current wallpaper. `~` works.
 - **Shuffle favorites every.** 5, 15 or 30 minutes, or 1, 3 or 6 hours.
-- **Wallhaven API key.** Optional, from [wallhaven.cc/settings/account](https://wallhaven.cc/settings/account). It unlocks the Sketchy and NSFW filters and is stored in plain text in `plugin_settings.json`.
+
+Sketchy and NSFW need a Wallhaven API key from [wallhaven.cc/settings/account](https://wallhaven.cc/settings/account). Set it as `WALLHAVEN_API_KEY` in the **session** environment (for example `~/.config/environment.d/wallhaven.conf`), then restart the session or `dms`. A key only in `~/.bashrc` is not visible to `dms.service`. The key is not stored in plugin settings.
 
 ## How it works with DMS
 
 DMS keeps control of the wallpaper, and the plugin only chooses the file. Your fill mode, transitions and matugen colors keep working. With per-monitor wallpapers on, a pick in the carousel goes to the monitor it opened on, and a Wallhaven download goes to every monitor.
 
-Favorites and Wallhaven tags are saved by file name in `plugin_settings.json`, next to your other DMS plugin settings. The color cache is `~/.local/state/DankMaterialShell/wallhavenCarousel/colors.json`. Downloads and API calls go through `dms dl`, and Trash through `dms trash`.
+`plugin_settings.json` only keeps the Settings panel values (`folder`, `favoritesInterval`). Favorites, the favorites shuffle flags and the last Wallhaven search filters live in DMS plugin state (`~/.local/state/dms/plugins/wallhavenCarousel_state.json`). Wallhaven tags and the color analysis cache are under `~/.local/state/dms/wallhavenCarousel/` (`tags.json`, `colors.json`). On first run after upgrading, legacy keys (including any old `apiKey`) are migrated out of `plugin_settings.json` and scrubbed. Downloads and API calls go through `dms dl`, and Trash through `dms trash`.
 
 Wallhaven's API allows 45 requests a minute. The plugin fetches tags one file at a time, 1.5 seconds apart, and tells you when Wallhaven is rate limiting a search.
 

@@ -14,23 +14,24 @@ FocusScope {
     readonly property string api: "https://wallhaven.cc/api/v1"
     readonly property int detailW: 440
 
-    property string query: String(hub.pluginData?.query ?? "")
-    property string categories: String(hub.pluginData?.categories || "111")
+    property string query: ""
+    property string categories: "111"
     // SFW, Sketchy, NSFW. Only sent with an API key; without one it's SFW.
-    property string purity: String(hub.pluginData?.purity || "100")
-    property string sorting: String(hub.pluginData?.sorting || "toplist")
+    property string purity: "100"
+    property string sorting: "toplist"
     // Empty string is "Any size"; only fall back when the key was never saved.
-    property string atleast: hub.pluginData?.atleast != null ? String(hub.pluginData.atleast) : "1920x1080"
+    property string atleast: "1920x1080"
     property int page: 1
     property int lastPage: 1
     property int total: -1
     property string seed: ""
     // Toplist's period: 1d, 3d, 1w, 1M, 3M, 6M or 1y.
-    property string topRange: String(hub.pluginData?.topRange || "1M")
+    property string topRange: "1M"
     property bool loading: false
     property string errorText: ""
     property int serial: 0
     property bool loaded: false
+    property bool filtersReady: false
 
     ListModel {
         id: results
@@ -107,9 +108,13 @@ FocusScope {
     }
 
     function enter() {
+        if (!filtersReady)
+            loadFilters();
         if (!loaded)
             search();
     }
+
+    Component.onCompleted: loadFilters()
 
     function leave() {
         hub.showLibrary();
@@ -140,22 +145,36 @@ FocusScope {
         if (http && http[1] === "429")
             return I18n.trFor("wallhavenCarousel", "Wallhaven is rate limiting searches. Wait a minute.");
         if (http && http[1] === "401")
-            return I18n.trFor("wallhavenCarousel", "Wallhaven rejected the API key. Check it in the plugin settings.");
+            return I18n.trFor("wallhavenCarousel", "Wallhaven rejected the API key. Check WALLHAVEN_API_KEY in the session environment.");
         if (http)
             return I18n.trFor("wallhavenCarousel", "Wallhaven answered with an error (HTTP %1).").arg(http[1]);
         return I18n.trFor("wallhavenCarousel", "No connection to Wallhaven.");
     }
 
+    function loadFilters() {
+        hub.ensureMigrated();
+        query = String(hub.loadState("query", ""));
+        categories = String(hub.loadState("categories", "111") || "111");
+        purity = String(hub.loadState("purity", "100") || "100");
+        sorting = String(hub.loadState("sorting", "toplist") || "toplist");
+        const savedAtleast = hub.loadState("atleast", null);
+        atleast = savedAtleast != null ? String(savedAtleast) : "1920x1080";
+        topRange = String(hub.loadState("topRange", "1M") || "1M");
+        filtersReady = true;
+    }
+
     function persistFilters() {
-        hub.saveData("query", query);
-        hub.saveData("categories", categories);
-        hub.saveData("purity", purity);
-        hub.saveData("sorting", sorting);
-        hub.saveData("atleast", atleast);
-        hub.saveData("topRange", topRange);
+        hub.saveState("query", query);
+        hub.saveState("categories", categories);
+        hub.saveState("purity", purity);
+        hub.saveState("sorting", sorting);
+        hub.saveState("atleast", atleast);
+        hub.saveState("topRange", topRange);
     }
 
     function search() {
+        if (!filtersReady)
+            loadFilters();
         persistFilters();
         const mine = ++serial;
         page = 1;
