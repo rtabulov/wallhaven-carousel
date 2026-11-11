@@ -18,7 +18,10 @@ PluginComponent {
     property var popoutService: null
 
     readonly property string userAgent: "wallhavenCarousel/1.2"
-    readonly property string apiKey: String(pluginData?.apiKey ?? "").trim()
+    // Session env only — never plugin_settings.json (see migrateLegacySettings).
+    readonly property string apiKey: String(Quickshell.env("WALLHAVEN_API_KEY") ?? "").trim()
+
+    property bool _migrated: false
 
     // ── Folder ────────────────────────────────────────────────────────────
     // One folder: the plugin's own setting, else DMS's cycling folder, else
@@ -29,6 +32,100 @@ PluginComponent {
 
     function expandHome(p) {
         return p.replace(/^~(?=\/|$)/, Quickshell.env("HOME") || "~");
+    }
+
+    function loadState(key, defaultValue) {
+        ensureMigrated();
+        if (!pluginService?.loadPluginState)
+            return defaultValue;
+        return pluginService.loadPluginState(pluginId, key, defaultValue);
+    }
+
+    function saveState(key, value) {
+        ensureMigrated();
+        pluginService?.savePluginState?.(pluginId, key, value);
+    }
+
+    // True when the key is absent from plugin state (vs present with any value).
+    function stateMissing(key) {
+        if (!pluginService?.loadPluginState)
+            return true;
+        const sentinel = {};
+        return pluginService.loadPluginState(pluginId, key, sentinel) === sentinel;
+    }
+
+    function ensureMigrated() {
+        if (!_migrated) {
+            _migrated = true;
+            migrateLegacySettings();
+            return;
+        }
+        // Tag cache write can lose a mkdir race; retry until settings no longer holds tags.
+        const leftover = pluginData?.tags;
+        if (leftover && typeof leftover === "object" && Object.keys(leftover).length > 0 && migrateLegacyTags(leftover))
+            scrubLegacySettingsKeys(["tags"]);
+    }
+
+    // Old builds stuffed runtime data and the API key into plugin_settings.json.
+    // Copy once into state/cache when the new homes are empty, then scrub.
+    function migrateLegacySettings() {
+        const data = pluginData || {};
+        const stateKeys = ["favorites", "favoritesRandom", "restoreCycling", "query", "categories", "purity", "sorting", "atleast", "topRange"];
+        for (const key of stateKeys) {
+            if (!stateMissing(key) || data[key] === undefined)
+                continue;
+            const value = key === "favorites" && data[key] ? Array.from(data[key]) : data[key];
+            pluginService?.savePluginState?.(pluginId, key, value);
+        }
+        const scrub = ["apiKey", "favorites", "favoritesRandom", "restoreCycling", "query", "categories", "purity", "sorting", "atleast", "topRange"];
+        if (migrateLegacyTags(data.tags))
+            scrub.push("tags");
+        scrubLegacySettingsKeys(scrub);
+    }
+
+    // Returns true when settings may drop `tags` (migrated, already cached, or nothing to move).
+    function migrateLegacyTags(legacyTags) {
+        if (!legacyTags || typeof legacyTags !== "object" || Object.keys(legacyTags).length === 0)
+            return true;
+        Paths.mkdir(Paths.state + "/wallhavenCarousel");
+        let existing = null;
+        try {
+            const raw = tagsFile.text();
+            if (raw && raw.trim())
+                existing = JSON.parse(raw);
+        } catch (e) {
+            existing = null;
+        }
+        if (existing && typeof existing === "object" && !Array.isArray(existing) && Object.keys(existing).length > 0)
+            return true;
+        try {
+            tagsFile.setText(JSON.stringify(legacyTags, null, 2));
+            const raw = tagsFile.text();
+            const parsed = raw && raw.trim() ? JSON.parse(raw) : null;
+            return !!(parsed && typeof parsed === "object" && Object.keys(parsed).length > 0);
+        } catch (e) {
+            console.warn("wallhavenCarousel: could not migrate tags cache; leaving tags in settings for retry");
+            return false;
+        }
+    }
+
+    function scrubLegacySettingsKeys(keys) {
+        if (!SettingsData?.pluginSettings?.[pluginId] || !keys || keys.length === 0)
+            return;
+        const updated = JSON.parse(JSON.stringify(SettingsData.pluginSettings));
+        const slice = updated[pluginId] || {};
+        let changed = false;
+        for (const key of keys) {
+            if (Object.prototype.hasOwnProperty.call(slice, key)) {
+                delete slice[key];
+                changed = true;
+            }
+        }
+        if (!changed)
+            return;
+        updated[pluginId] = slice;
+        SettingsData.pluginSettings = updated;
+        SettingsData.savePluginSettings();
     }
 
     readonly property string folder: {
@@ -92,7 +189,7 @@ PluginComponent {
     }
 
     // ── Favorites ─────────────────────────────────────────────────────────
-    // Stored by file name in plugin_settings.json: there is only one folder.
+    // Stored by file name in plugin state: there is only one folder.
     property var favorites: []
     readonly property var favoriteSet: {
         const s = {};
@@ -109,20 +206,15 @@ PluginComponent {
     }
 
     function loadFavorites() {
-        const v = pluginData?.favorites;
+        const v = loadState("favorites", []);
         const arr = v ? Array.from(v) : [];
         if (JSON.stringify(arr) !== JSON.stringify(favorites))
             favorites = arr;
     }
 
-    onPluginDataChanged: {
-        loadFavorites();
-        loadTags();
-    }
-
     function saveFavorites(arr) {
         favorites = arr;
-        pluginService?.savePluginData(pluginId, "favorites", arr);
+        saveState("favorites", arr);
     }
 
     function setFavorite(name, on) {
@@ -143,6 +235,15 @@ PluginComponent {
     property bool analyzing: false
     property bool analyzeAgain: false
     readonly property string colorCache: stripFile(Paths.state) + "/wallhavenCarousel/colors.json"
+    readonly property string tagCache: stripFile(Paths.state) + "/wallhavenCarousel/tags.json"
+
+    FileView {
+        id: tagsFile
+        path: root.tagCache
+        blockLoading: true
+        blockWrites: true
+        atomicWrites: true
+    }
 
     Timer {
         id: analyzeTimer
@@ -177,10 +278,31 @@ PluginComponent {
     property var tags: ({})
 
     function loadTags() {
-        const v = pluginData?.tags;
-        const t = v ? JSON.parse(JSON.stringify(v)) : {};
+        ensureMigrated();
+        let t = {};
+        try {
+            const raw = tagsFile.text();
+            if (raw && raw.trim())
+                t = JSON.parse(raw);
+        } catch (e) {
+            t = {};
+        }
+        if (typeof t !== "object" || t === null || Array.isArray(t))
+            t = {};
+        // While a legacy tags migrate is still pending, keep using settings data in-memory.
+        if (Object.keys(t).length === 0 && pluginData?.tags && typeof pluginData.tags === "object")
+            t = JSON.parse(JSON.stringify(pluginData.tags));
         if (JSON.stringify(t) !== JSON.stringify(tags))
             tags = t;
+    }
+
+    function persistTags() {
+        Paths.mkdir(Paths.state + "/wallhavenCarousel");
+        try {
+            tagsFile.setText(JSON.stringify(tags, null, 2));
+        } catch (e) {
+            console.warn("wallhavenCarousel: could not write tags cache");
+        }
     }
 
     function setTags(name, list) {
@@ -190,7 +312,7 @@ PluginComponent {
         else
             t[name] = list;
         tags = t;
-        saveData("tags", t);
+        persistTags();
     }
 
     property var tagQueue: []
@@ -209,11 +331,12 @@ PluginComponent {
     }
 
     // `dms dl` with its errors on stdout, the only stream Proc hands back,
-    // so "HTTP 429" tells a rate limit from a dropped connection. With an API
-    // key, it goes along as X-API-Key (Sketchy/NSFW results and details).
+    // so "HTTP 429" tells a rate limit from a dropped connection. With
+    // WALLHAVEN_API_KEY in the session, the child inherits it and sends
+    // X-API-Key (Sketchy/NSFW) without putting the secret on argv.
     function fetch(url) {
         if (apiKey)
-            return ["sh", "-c", 'exec dms dl --connect-timeout 10 --timeout 30 --user-agent "$1" -H "X-API-Key: $3" "$2" 2>&1', "sh", userAgent, url, apiKey];
+            return ["sh", "-c", 'exec dms dl --connect-timeout 10 --timeout 30 --user-agent "$1" -H "X-API-Key: $WALLHAVEN_API_KEY" "$2" 2>&1', "sh", userAgent, url];
         return ["sh", "-c", 'exec dms dl --connect-timeout 10 --timeout 30 --user-agent "$1" "$2" 2>&1', "sh", userAgent, url];
     }
 
@@ -360,12 +483,14 @@ PluginComponent {
     // ── Shuffle among favorites only ──────────────────────────────────────
     // DMS's timer cycles through every file in the folder. While this one is
     // on, DMS's is off (and comes back as it was when this is turned off).
-    readonly property bool favoritesRandom: !!pluginData?.favoritesRandom
+    property bool favoritesRandom: false
+    property bool restoreCycling: false
     readonly property int favoritesIntervalMin: parseInt(pluginData?.favoritesInterval) || 60
     property bool _changingCycling: false
 
-    function saveData(key, value) {
-        pluginService?.savePluginData(pluginId, key, value);
+    function loadShuffleState() {
+        favoritesRandom = !!loadState("favoritesRandom", false);
+        restoreCycling = !!loadState("restoreCycling", false);
     }
 
     function setDmsCycling(on) {
@@ -391,16 +516,20 @@ PluginComponent {
                 return;
             }
             if (SessionData.wallpaperCyclingEnabled) {
-                saveData("restoreCycling", true);
+                restoreCycling = true;
+                saveState("restoreCycling", true);
                 setDmsCycling(false);
             }
-            saveData("favoritesRandom", true);
+            favoritesRandom = true;
+            saveState("favoritesRandom", true);
             pickRandomFavorite();
             ToastService?.showInfo(I18n.trFor("wallhavenCarousel", "Favorites shuffle on"));
         } else {
-            saveData("favoritesRandom", false);
-            if (pluginData?.restoreCycling) {
-                saveData("restoreCycling", false);
+            favoritesRandom = false;
+            saveState("favoritesRandom", false);
+            if (restoreCycling) {
+                restoreCycling = false;
+                saveState("restoreCycling", false);
                 setDmsCycling(true);
             }
             ToastService?.showInfo(I18n.trFor("wallhavenCarousel", "Favorites shuffle off"));
@@ -413,8 +542,10 @@ PluginComponent {
         function onWallpaperCyclingEnabledChanged() {
             if (root._changingCycling || !root.favoritesRandom || !SessionData.wallpaperCyclingEnabled)
                 return;
-            root.saveData("restoreCycling", false);
-            root.saveData("favoritesRandom", false);
+            root.restoreCycling = false;
+            root.favoritesRandom = false;
+            root.saveState("restoreCycling", false);
+            root.saveState("favoritesRandom", false);
         }
     }
 
@@ -608,7 +739,9 @@ PluginComponent {
     }
 
     Component.onCompleted: {
+        ensureMigrated();
         loadFavorites();
+        loadShuffleState();
         loadTags();
         scanTimer.restart();
         console.info("wallhavenCarousel: ready (dms ipc call wallhavenCarousel toggle)");

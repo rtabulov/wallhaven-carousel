@@ -16,11 +16,13 @@ function discovery(overrides = {}) {
             previewDir: '/cache/preview',
             previewScript: '/plugin/preview-cache.sh',
             userAgent: 'test-agent',
-            saveData: (key, value) => saved.push([key, value]),
+            ensureMigrated: () => {},
+            loadState: () => undefined,
+            saveState: (key, value) => saved.push([key, value]),
         },
         api: 'https://wallhaven.cc/api/v1', query: '', categories: '111', purity: '111', sorting: 'toplist', topRange: '1M', atleast: '', seed: '',
         previewing: true, grid: { currentIndex: 0 }, results: { count: data.length, get: i => data[i] },
-        cachedFull: {}, fetchingFull: {}, failedFull: {}, previewQueue: [], cacheMinutes: 30,
+        cachedFull: {}, fetchingFull: {}, failedFull: {}, previewQueue: [], cacheMinutes: 30, filtersReady: true,
         Proc: { runCommand: (...args) => calls.push(args) },
         I18n: { trFor: (_id, text) => text },
         ...overrides,
@@ -66,7 +68,7 @@ test('no key keeps SFW; all seven toplist periods reach the API URL', () => {
     state.hub.apiKey = 'fake-test-key';
     state.purity = '010';
     assert.equal(new URL(state.url(2)).searchParams.get('purity'), '010');
-    assert.equal(state.explain('HTTP 401'), 'Wallhaven rejected the API key. Check it in the plugin settings.');
+    assert.equal(state.explain('HTTP 401'), 'Wallhaven rejected the API key. Check WALLHAVEN_API_KEY in the session environment.');
 });
 
 test('fast navigation keeps at most three active downloads and replaces queued neighbors', () => {
