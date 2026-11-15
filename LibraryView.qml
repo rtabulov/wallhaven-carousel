@@ -522,7 +522,7 @@ FocusScope {
             if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
                 return;
             if (view.confirmName !== "") {
-                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Y)
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Y || event.key === Qt.Key_D || event.key === Qt.Key_Delete)
                     view.confirmDelete();
                 else if (event.key === Qt.Key_Escape || event.key === Qt.Key_N)
                     view.confirmName = "";
@@ -839,7 +839,7 @@ FocusScope {
                     visible: view.confirmName !== ""
                     icon: "delete"
                     label: I18n.trFor("wallhavenCarousel", "Move to the Trash")
-                    hint: "Enter"
+                    hint: "D / Enter"
                     danger: true
                     onClicked: view.confirmDelete()
                 }
