@@ -24,6 +24,10 @@ _Avoid_: Next page, pagination, infinite scroll
 A short message inside Preview when Load more fails, or when the search has no further page.
 _Avoid_: Toast, notification, banner
 
+**Wallhaven page**:
+The public wallhaven.cc page for a wallpaper (`/w/{id}`), opened from Discover.
+_Avoid_: Browser, external link, source, meta page
+
 **Delete confirm**:
 The brief pause after the user asks to delete a wallpaper, before it is moved to the Trash. The wallpaper is named in the prompt; the user must confirm or cancel.
 _Avoid_: Chord, timed double-tap, operator-pending

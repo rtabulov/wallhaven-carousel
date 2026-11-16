@@ -118,7 +118,21 @@ FocusScope {
         }
     }
 
-    // Enter, F and D do the same in the grid and in the preview.
+    function wallhavenPageUrl(wid) {
+        return "https://wallhaven.cc/w/" + wid;
+    }
+
+    // Opens the Wallhaven page for the selected result; closes the overlay only if open succeeds.
+    function openWallhavenPage() {
+        if (!selected)
+            return false;
+        if (!Qt.openUrlExternally(wallhavenPageUrl(selected.wid)))
+            return false;
+        hub.close();
+        return true;
+    }
+
+    // Enter, F, D and O do the same in the grid and in the preview.
     function act(key) {
         if (!selected)
             return false;
@@ -134,6 +148,8 @@ FocusScope {
                 downloadSelected(true, true);
         } else if (key === Qt.Key_D) {
             downloadSelected(false, false);
+        } else if (key === Qt.Key_O) {
+            return openWallhavenPage();
         } else {
             return false;
         }
@@ -788,6 +804,7 @@ FocusScope {
             case Qt.Key_Enter:
             case Qt.Key_F:
             case Qt.Key_D:
+            case Qt.Key_O:
                 view.act(event.key);
                 break;
             case Qt.Key_Space:
@@ -1116,6 +1133,14 @@ FocusScope {
                     onClicked: view.hub.toggleFavorite(view.selected.fileName)
                 }
             }
+
+            PillButton {
+                width: parent.width
+                icon: "open_in_new"
+                label: I18n.trFor("wallhavenCarousel", "On Wallhaven")
+                hint: "O"
+                onClicked: view.openWallhavenPage()
+            }
         }
 
         StyledText {
@@ -1356,6 +1381,12 @@ FocusScope {
                     label: view.selectedIsFavorite ? I18n.trFor("wallhavenCarousel", "Unfavorite") : I18n.trFor("wallhavenCarousel", "Favorite")
                     hint: "F"
                     onClicked: view.hub.toggleFavorite(view.selected.fileName)
+                }
+                PillButton {
+                    icon: "open_in_new"
+                    label: I18n.trFor("wallhavenCarousel", "On Wallhaven")
+                    hint: "O"
+                    onClicked: view.openWallhavenPage()
                 }
                 PillButton {
                     icon: view.previewFill ? "fit_screen" : "fullscreen"
