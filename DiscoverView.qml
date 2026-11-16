@@ -29,6 +29,11 @@ FocusScope {
     property string topRange: "1M"
     property bool loading: false
     property string errorText: ""
+    property string noticeText: ""
+    // End-of-search Notice uses normal text color; failures use error color.
+    property bool noticeIsEnd: false
+    // Index where Next armed Load more; -1 means disarmed.
+    property int armedNextFrom: -1
     property int serial: 0
     property bool loaded: false
     property bool filtersReady: false
@@ -72,16 +77,44 @@ FocusScope {
         preview.forceActiveFocus();
     }
 
+    function clearNotice() {
+        noticeText = "";
+        noticeIsEnd = false;
+    }
+
+    // Preview Notice only; endOfSearch picks normal text color, else error color.
+    function plantPreviewNotice(text, endOfSearch) {
+        if (!previewing)
+            return;
+        noticeText = text;
+        noticeIsEnd = !!endOfSearch;
+    }
+
+    function noticeNoMoreResults() {
+        plantPreviewNotice(I18n.trFor("wallhavenCarousel", "No more results"), true);
+    }
+
     function closePreview() {
         previewing = false;
+        clearNotice();
+        armedNextFrom = -1;
         grid.forceActiveFocus();
     }
 
     function step(delta) {
+        const onLast = results.count > 0 && grid.currentIndex === results.count - 1;
+        if (delta > 0 && onLast && previewing && !loading) {
+            if (page < lastPage)
+                armedNextFrom = grid.currentIndex;
+            loadMore();
+            return;
+        }
         const i = Math.max(0, Math.min(results.count - 1, grid.currentIndex + delta));
         if (i !== grid.currentIndex) {
+            armedNextFrom = -1;
             grid.currentIndex = i;
             grid.positionViewAtIndex(i, GridView.Contain);
+            clearNotice();
         }
     }
 
@@ -176,6 +209,8 @@ FocusScope {
         if (!filtersReady)
             loadFilters();
         persistFilters();
+        // New search replaces the result list; an armed Next against a vanished index would be wrong.
+        armedNextFrom = -1;
         const mine = ++serial;
         page = 1;
         lastPage = 1;
@@ -199,8 +234,12 @@ FocusScope {
     }
 
     function loadMore() {
-        if (loading || page >= lastPage || results.count === 0)
+        if (loading || results.count === 0)
             return;
+        if (page >= lastPage) {
+            noticeNoMoreResults();
+            return;
+        }
         const mine = ++serial;
         const next = page + 1;
         loading = true;
@@ -209,12 +248,26 @@ FocusScope {
             if (mine !== view.serial)
                 return;
             view.loading = false;
+            const armedFrom = view.armedNextFrom;
+            view.armedNextFrom = -1;
             if (code !== 0) {
                 view.errorText = view.explain(out);
+                view.plantPreviewNotice(view.errorText, false);
                 return;
             }
             view.page = next;
+            const before = results.count;
             view.take(out);
+            if (view.errorText !== "") {
+                view.plantPreviewNotice(view.errorText, false);
+            } else if (results.count > before) {
+                view.clearNotice();
+                if (armedFrom >= 0 && grid.currentIndex === armedFrom)
+                    view.step(1);
+            } else {
+                view.lastPage = view.page;
+                view.noticeNoMoreResults();
+            }
         }, 0, 40000, view);
     }
 
@@ -1249,6 +1302,14 @@ FocusScope {
                 color: Theme.surfaceText
                 font.pixelSize: Theme.fontSizeLarge
                 font.weight: Font.Medium
+            }
+
+            StyledText {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: view.noticeText !== ""
+                text: view.noticeText
+                color: view.noticeIsEnd ? Theme.surfaceText : Theme.error
+                font.pixelSize: Theme.fontSizeMedium
             }
 
             Row {
