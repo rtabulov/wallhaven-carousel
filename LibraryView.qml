@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell.Widgets
 import qs.Common
 import qs.DCommon.Widgets
+import "OverlayKeyMap.js" as OverlayKeys
 
 // The library: the folder's wallpapers in a skewed carousel.
 FocusScope {
@@ -521,81 +522,60 @@ FocusScope {
         Keys.onPressed: event => {
             if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
                 return;
+            const k = OverlayKeys.keyId(event);
             if (view.confirmName !== "") {
-                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Y || event.key === Qt.Key_D || event.key === Qt.Key_Delete)
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Delete
+                        || k === "Y" || k === "D")
                     view.confirmDelete();
-                else if (event.key === Qt.Key_Escape || event.key === Qt.Key_N)
+                else if (event.key === Qt.Key_Escape || k === "N")
                     view.confirmName = "";
                 event.accepted = true;
                 return;
             }
             event.accepted = true;
-            switch (event.key) {
-            case Qt.Key_Left:
-            case Qt.Key_H:
+            if (event.key === Qt.Key_Left || k === "H")
                 list.decrementCurrentIndex();
-                break;
-            case Qt.Key_Right:
-            case Qt.Key_L:
+            else if (event.key === Qt.Key_Right || k === "L")
                 list.incrementCurrentIndex();
-                break;
-            case Qt.Key_PageUp:
+            else if (event.key === Qt.Key_PageUp)
                 list.currentIndex = Math.max(0, list.currentIndex - 5);
-                break;
-            case Qt.Key_PageDown:
+            else if (event.key === Qt.Key_PageDown)
                 list.currentIndex = Math.min(list.count - 1, list.currentIndex + 5);
-                break;
-            case Qt.Key_Home:
+            else if (event.key === Qt.Key_Home)
                 list.currentIndex = 0;
-                break;
-            case Qt.Key_End:
+            else if (event.key === Qt.Key_End)
                 list.currentIndex = list.count - 1;
-                break;
-            case Qt.Key_Return:
-            case Qt.Key_Enter:
+            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 view.applyCurrent();
-                break;
-            case Qt.Key_F:
+            else if (k === "F") {
                 if (view.current)
                     view.hub.toggleFavorite(view.current.name);
-                break;
-            case Qt.Key_Delete:
-            case Qt.Key_D:
+            } else if (event.key === Qt.Key_Delete || k === "D")
                 view.startDelete();
-                break;
-            case Qt.Key_Slash:
+            else if (k === "Slash")
                 view.openSearch();
-                break;
-            case Qt.Key_Tab:
+            else if (event.key === Qt.Key_Tab)
                 view.favoritesOnly = !view.favoritesOnly;
-                break;
-            case Qt.Key_R:
+            else if (k === "R")
                 view.hub.setFavoritesRandom(!view.hub.favoritesRandom);
-                break;
-            case Qt.Key_C:
+            else if (k === "C")
                 view.filtersOpen = !view.filtersOpen;
-                break;
-            case Qt.Key_Comma:
+            else if (k === "Comma")
                 view.cycleColor(-1);
-                break;
-            case Qt.Key_Period:
+            else if (k === "Period")
                 view.cycleColor(1);
-                break;
-            case Qt.Key_T:
+            else if (k === "T")
                 view.cycleTag();
-                break;
-            case Qt.Key_A:
+            else if (k === "A")
                 view.hub.showDiscover();
-                break;
-            case Qt.Key_Escape:
+            else if (event.key === Qt.Key_Escape) {
                 if (view.searchText !== "" || view.searching)
                     view.closeSearch();
                 else if (view.colorFilter !== "" || view.tagFilter !== "")
                     view.clearFilters();
                 else
                     view.hub.close();
-                break;
-            default:
+            } else {
                 event.accepted = false;
             }
         }

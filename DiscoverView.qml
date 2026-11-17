@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell.Widgets
 import qs.Common
 import qs.DCommon.Widgets
+import "OverlayKeyMap.js" as OverlayKeys
 
 // Adding wallpapers: a Wallhaven search (SFW, or Sketchy/NSFW with an API key). Picking one opens the
 // controls; downloading puts the file in the folder and, if asked, uses and
@@ -132,28 +133,41 @@ FocusScope {
         return true;
     }
 
-    // Enter, F, D and O do the same in the grid and in the preview.
-    function act(key) {
+    // use / favorite / download / openPage — same in the grid and in Preview.
+    function act(action) {
         if (!selected)
             return false;
-        if (key === Qt.Key_Return || key === Qt.Key_Enter) {
+        if (action === "use") {
             if (selectedInLibrary)
                 hub.apply(selected.fileName);
             else
                 downloadSelected(true, false);
-        } else if (key === Qt.Key_F) {
+        } else if (action === "favorite") {
             if (selectedInLibrary)
                 hub.toggleFavorite(selected.fileName);
             else
                 downloadSelected(true, true);
-        } else if (key === Qt.Key_D) {
+        } else if (action === "download") {
             downloadSelected(false, false);
-        } else if (key === Qt.Key_O) {
+        } else if (action === "openPage") {
             return openWallhavenPage();
         } else {
             return false;
         }
         return true;
+    }
+
+    function actFromEvent(event) {
+        const k = OverlayKeys.keyId(event);
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+            return act("use");
+        if (k === "F")
+            return act("favorite");
+        if (k === "D")
+            return act("download");
+        if (k === "O")
+            return act("openPage");
+        return false;
     }
 
     function enter() {
@@ -798,30 +812,20 @@ FocusScope {
         Keys.onPressed: event => {
             if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
                 return;
+            const k = OverlayKeys.keyId(event);
             event.accepted = true;
-            switch (event.key) {
-            case Qt.Key_Return:
-            case Qt.Key_Enter:
-            case Qt.Key_F:
-            case Qt.Key_D:
-            case Qt.Key_O:
-                view.act(event.key);
-                break;
-            case Qt.Key_Space:
+            if (view.actFromEvent(event))
+                return;
+            if (event.key === Qt.Key_Space)
                 view.openPreview();
-                break;
-            case Qt.Key_PageDown:
+            else if (event.key === Qt.Key_PageDown)
                 view.loadMore();
-                break;
-            case Qt.Key_Slash:
+            else if (k === "Slash")
                 searchBox.focusInput();
-                break;
-            case Qt.Key_Escape:
+            else if (event.key === Qt.Key_Escape)
                 view.leave();
-                break;
-            default:
+            else
                 event.accepted = false;
-            }
         }
 
         delegate: Item {
@@ -1279,29 +1283,20 @@ FocusScope {
             Keys.onPressed: event => {
                 if (event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
                     return;
+                const k = OverlayKeys.keyId(event);
                 event.accepted = true;
-                switch (event.key) {
-                case Qt.Key_Left:
-                case Qt.Key_H:
+                if (event.key === Qt.Key_Left || k === "H")
                     view.step(-1);
-                    break;
-                case Qt.Key_Right:
-                case Qt.Key_L:
+                else if (event.key === Qt.Key_Right || k === "L")
                     view.step(1);
-                    break;
-                case Qt.Key_PageDown:
+                else if (event.key === Qt.Key_PageDown)
                     view.loadMore();
-                    break;
-                case Qt.Key_Tab:
+                else if (event.key === Qt.Key_Tab)
                     view.previewFill = !view.previewFill;
-                    break;
-                case Qt.Key_Space:
-                case Qt.Key_Escape:
+                else if (event.key === Qt.Key_Space || event.key === Qt.Key_Escape)
                     view.closePreview();
-                    break;
-                default:
-                    event.accepted = view.act(event.key);
-                }
+                else
+                    event.accepted = view.actFromEvent(event);
             }
         }
 
