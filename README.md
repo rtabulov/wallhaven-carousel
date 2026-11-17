@@ -100,6 +100,8 @@ Mod+Shift+Tab { spawn "dms" "ipc" "call" "wallhavenCarousel" "toggle"; }
 
 ## Keys
 
+Letter and punctuation Keys are physical US-QWERTY positions (layout-independent).
+
 In the carousel:
 
 | Key | Action |

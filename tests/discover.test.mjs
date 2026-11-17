@@ -797,13 +797,12 @@ test('openWallhavenPage leaves the overlay open when open fails', () => {
     assert.equal(closed, 0);
 });
 
-test('act O opens the Wallhaven page', () => {
+test('act openPage opens the Wallhaven page', () => {
     const opened = [];
     let closed = 0;
     const { state } = discovery({
         selected: { wid: 'zz9' },
         Qt: {
-            Key_O: 79,
             openUrlExternally: url => {
                 opened.push(url);
                 return true;
@@ -813,7 +812,7 @@ test('act O opens the Wallhaven page', () => {
     state.hub.close = () => {
         closed += 1;
     };
-    assert.equal(state.act(79), true);
+    assert.equal(state.act('openPage'), true);
     assert.deepEqual(opened, ['https://wallhaven.cc/w/zz9']);
     assert.equal(closed, 1);
 });
