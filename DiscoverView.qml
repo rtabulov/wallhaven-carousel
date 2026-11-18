@@ -123,14 +123,11 @@ FocusScope {
         return "https://wallhaven.cc/w/" + wid;
     }
 
-    // Opens the Wallhaven page for the selected result; closes the overlay only if open succeeds.
+    // Opens the Wallhaven page for the selected result; Discover stays open.
     function openWallhavenPage() {
         if (!selected)
             return false;
-        if (!Qt.openUrlExternally(wallhavenPageUrl(selected.wid)))
-            return false;
-        hub.close();
-        return true;
+        return !!Qt.openUrlExternally(wallhavenPageUrl(selected.wid));
     }
 
     // use / favorite / download / openPage — same in the grid and in Preview.

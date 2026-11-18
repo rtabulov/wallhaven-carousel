@@ -25,7 +25,7 @@ A short message inside Preview when Load more fails, or when the search has no f
 _Avoid_: Toast, notification, banner
 
 **Wallhaven page**:
-The public wallhaven.cc page for a wallpaper (`/w/{id}`), opened from Discover.
+The public wallhaven.cc page for a wallpaper (`/w/{id}`), opened from Discover. Opening it leaves Discover open.
 _Avoid_: Browser, external link, source, meta page
 
 **Delete confirm**:

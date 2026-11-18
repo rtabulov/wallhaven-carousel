@@ -744,7 +744,7 @@ test('wallhavenPageUrl is the public Wallhaven page for an id', () => {
     assert.equal(state.wallhavenPageUrl('abc12'), 'https://wallhaven.cc/w/abc12');
 });
 
-test('openWallhavenPage opens the Wallhaven page then closes the overlay', () => {
+test('openWallhavenPage opens the Wallhaven page and leaves Discover open', () => {
     const opened = [];
     let closed = 0;
     const { state } = discovery({
@@ -761,7 +761,7 @@ test('openWallhavenPage opens the Wallhaven page then closes the overlay', () =>
     };
     assert.equal(state.openWallhavenPage(), true);
     assert.deepEqual(opened, ['https://wallhaven.cc/w/abc12']);
-    assert.equal(closed, 1);
+    assert.equal(closed, 0);
 });
 
 test('openWallhavenPage does nothing with no selection', () => {
@@ -784,7 +784,7 @@ test('openWallhavenPage does nothing with no selection', () => {
     assert.equal(closed, 0);
 });
 
-test('openWallhavenPage leaves the overlay open when open fails', () => {
+test('openWallhavenPage returns false when open fails', () => {
     let closed = 0;
     const { state } = discovery({
         selected: { wid: 'abc12' },
@@ -797,7 +797,7 @@ test('openWallhavenPage leaves the overlay open when open fails', () => {
     assert.equal(closed, 0);
 });
 
-test('act openPage opens the Wallhaven page', () => {
+test('act openPage opens the Wallhaven page and leaves Discover open', () => {
     const opened = [];
     let closed = 0;
     const { state } = discovery({
@@ -814,5 +814,5 @@ test('act openPage opens the Wallhaven page', () => {
     };
     assert.equal(state.act('openPage'), true);
     assert.deepEqual(opened, ['https://wallhaven.cc/w/zz9']);
-    assert.equal(closed, 1);
+    assert.equal(closed, 0);
 });
